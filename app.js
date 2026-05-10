@@ -14,6 +14,9 @@ const ui = {
   melodyPattern: $('melodyPattern'),
   melodyClarity: $('melodyClarity'),
   melodyClarityValue: $('melodyClarityValue'),
+  songFeel: $('songFeel'),
+  groove: $('groove'),
+  grooveValue: $('grooveValue'),
   noise: $('noise'),
   pulse: $('pulse'),
   musicBits: $('musicBits'),
@@ -118,8 +121,10 @@ function createEngine() {
     pulseTimer: null,
     musicTimer: null,
     melodyTimer: null,
+    arrangementTimer: null,
     musicStep: 0,
     melodyStep: 0,
+    arrangementStep: 0,
   };
 }
 
@@ -320,6 +325,164 @@ function playMelodyNote(engine, frequency, clarity, stimulation, accent = 1) {
   osc.stop(now + 1.4);
 }
 
+
+const progressions = {
+  deep: [0, 5, 3, 6],
+  coding: [0, 4, 5, 3],
+  reading: [0, 3, 5, 4],
+  energy: [0, 5, 2, 4],
+};
+
+const songMotifs = {
+  ambient: [0, -1, 2, -1, 4, 2, -1, 1, 0, -1, 2, 4, 5, -1, 4, 2],
+  lofi: [0, 2, -1, 4, 2, -1, 0, 1, 3, -1, 2, 0, -1, 4, 2, -1],
+  synth: [0, 2, 4, 2, 5, 4, 2, 0, 0, 3, 5, 3, 6, 5, 3, 1],
+};
+
+function scaleTone(preset, index, octave = 1) {
+  const safe = ((index % preset.scale.length) + preset.scale.length) % preset.scale.length;
+  return noteFrequency(preset.root, preset.scale[safe], octave);
+}
+
+function playKick(engine, strength = 0.45) {
+  const now = engine.ctx.currentTime;
+  const osc = engine.ctx.createOscillator();
+  const gain = engine.ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(92, now);
+  osc.frequency.exponentialRampToValueAtTime(42, now + 0.14);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(strength, now + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+  osc.connect(gain).connect(engine.lowpass);
+  osc.start(now);
+  osc.stop(now + 0.28);
+}
+
+function playHat(engine, strength = 0.05) {
+  const now = engine.ctx.currentTime;
+  const noise = makeBrownNoise(engine.ctx);
+  const filter = engine.ctx.createBiquadFilter();
+  const gain = engine.ctx.createGain();
+  filter.type = 'highpass';
+  filter.frequency.value = 5200;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(strength, now + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+  noise.connect(filter).connect(gain).connect(engine.lowpass);
+  setTimeout(() => noise.disconnect(), 120);
+}
+
+function playBass(engine, frequency, strength = 0.12) {
+  const now = engine.ctx.currentTime;
+  const osc = engine.ctx.createOscillator();
+  const gain = engine.ctx.createGain();
+  const filter = engine.ctx.createBiquadFilter();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(frequency, now);
+  filter.type = 'lowpass';
+  filter.frequency.value = 420;
+  filter.Q.value = 0.9;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(strength, now + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
+  osc.connect(filter).connect(gain).connect(engine.lowpass);
+  osc.start(now);
+  osc.stop(now + 0.55);
+}
+
+function playChord(engine, preset, chordRootIndex, amount = 0.12) {
+  const chord = [0, 2, 4, 6];
+  chord.forEach((offset, i) => {
+    const now = engine.ctx.currentTime;
+    const osc = engine.ctx.createOscillator();
+    const gain = engine.ctx.createGain();
+    const filter = engine.ctx.createBiquadFilter();
+    const pan = engine.ctx.createStereoPanner();
+    osc.type = i % 2 ? 'triangle' : 'sawtooth';
+    osc.frequency.setValueAtTime(scaleTone(preset, chordRootIndex + offset, i >= 2 ? 2 : 1), now);
+    osc.detune.value = (i - 1.5) * 4;
+    filter.type = 'lowpass';
+    filter.frequency.value = 820 + amount * 900;
+    filter.Q.value = 0.8;
+    pan.pan.value = (i - 1.5) * 0.18;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(amount * 0.16, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.85);
+    osc.connect(filter).connect(gain);
+    gain.connect(pan).connect(engine.lowpass);
+    gain.connect(engine.musicDelay);
+    osc.start(now);
+    osc.stop(now + 2.1);
+  });
+}
+
+function playSongLead(engine, preset, chordRootIndex, motifValue, clarity, style, accent = 1) {
+  if (motifValue < 0) return;
+  const frequency = scaleTone(preset, chordRootIndex + motifValue, 2);
+  const now = engine.ctx.currentTime;
+  const osc = engine.ctx.createOscillator();
+  const gain = engine.ctx.createGain();
+  const filter = engine.ctx.createBiquadFilter();
+  osc.type = style === 'lofi' ? 'sine' : 'triangle';
+  osc.frequency.setValueAtTime(frequency, now);
+  filter.type = 'lowpass';
+  filter.frequency.value = style === 'synth' ? 2600 : 1500;
+  filter.Q.value = 1.4;
+  const peak = (0.018 + clarity * 0.00055) * accent;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(peak * 0.35, now + 0.18);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + (style === 'ambient' ? 0.9 : 0.48));
+  osc.connect(filter).connect(gain).connect(engine.lowpass);
+  gain.connect(engine.musicDelay);
+  osc.start(now);
+  osc.stop(now + 1.1);
+}
+
+function startSongArrangement(engine, preset, stimulation) {
+  const feel = ui.songFeel.value;
+  if (feel === 'off') return;
+
+  const beatMs = 60000 / preset.bpm;
+  const sixteenthMs = beatMs / 2;
+  const presetName = ui.mode.value;
+  const progression = progressions[presetName] || progressions.coding;
+
+  engine.arrangementTimer = setInterval(() => {
+    const style = ui.songFeel.value;
+    if (style === 'off') return;
+
+    const step = engine.arrangementStep++;
+    const groove = Number(ui.groove.value);
+    const clarity = Number(ui.melodyClarity.value);
+    const bar = Math.floor(step / 16);
+    const inBar = step % 16;
+    const chordRootIndex = progression[bar % progression.length];
+    const chordRootFreq = scaleTone(preset, chordRootIndex, 0.5);
+    const motif = songMotifs[style] || songMotifs.ambient;
+
+    if (inBar === 0) playChord(engine, preset, chordRootIndex, 0.10 + groove / 900);
+
+    // Soft, regular rhythm gives the ear something musical to lock onto.
+    if (style !== 'ambient' && (inBar === 0 || inBar === 8)) playKick(engine, 0.16 + groove / 350);
+    if (style === 'lofi' && (inBar === 4 || inBar === 12)) playHat(engine, 0.018 + groove / 1800);
+    if (style === 'synth' && inBar % 4 === 2) playHat(engine, 0.014 + groove / 2200);
+
+    if ([0, 6, 8, 14].includes(inBar)) {
+      const bassStep = inBar === 14 ? chordRootIndex + 2 : chordRootIndex;
+      playBass(engine, scaleTone(preset, bassStep, 0.5), 0.055 + groove / 900);
+    }
+
+    const leadDensity = style === 'ambient' ? [0, 4, 8, 12] : [0, 2, 4, 6, 8, 10, 12, 14];
+    if (leadDensity.includes(inBar)) {
+      const motifIndex = Math.floor(step / 2) % motif.length;
+      const phraseLift = bar % 4 === 3 && inBar >= 12 ? 1 : 0;
+      playSongLead(engine, preset, chordRootIndex, motif[motifIndex] + phraseLift, clarity, style, inBar === 0 ? 1.25 : 1);
+    }
+  }, sixteenthMs);
+}
+
 function startBinaural(engine, preset) {
   if (!ui.binaural.checked) return;
   const merger = engine.ctx.createChannelMerger(2);
@@ -368,6 +531,7 @@ async function start() {
   startPulse(audio, preset, stimulation);
   startMusicBits(audio, preset, stimulation);
   startClearMelody(audio, preset, stimulation);
+  startSongArrangement(audio, preset, stimulation);
   startBinaural(audio, preset);
   applySettings();
 
@@ -398,6 +562,7 @@ function stop(completed = false) {
       if (engineToClose.pulseTimer) clearInterval(engineToClose.pulseTimer);
       if (engineToClose.musicTimer) clearInterval(engineToClose.musicTimer);
       if (engineToClose.melodyTimer) clearInterval(engineToClose.melodyTimer);
+      if (engineToClose.arrangementTimer) clearInterval(engineToClose.arrangementTimer);
       engineToClose.oscillators.forEach((osc) => { try { osc.stop(); } catch {} });
       engineToClose.lfos.forEach((osc) => { try { osc.stop(); } catch {} });
       if (engineToClose.noiseNode) engineToClose.noiseNode.disconnect();
@@ -417,6 +582,7 @@ ui.adhd.addEventListener('input', () => ui.adhdValue.textContent = ui.adhd.value
 ui.volume.addEventListener('input', () => ui.volumeValue.textContent = ui.volume.value);
 ui.musicAmount.addEventListener('input', () => ui.musicAmountValue.textContent = ui.musicAmount.value);
 ui.melodyClarity.addEventListener('input', () => ui.melodyClarityValue.textContent = ui.melodyClarity.value);
+ui.groove.addEventListener('input', () => ui.grooveValue.textContent = ui.groove.value);
 ui.minutes.addEventListener('change', () => {
   if (!audio) {
     remainingSeconds = Number(ui.minutes.value) * 60;

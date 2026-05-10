@@ -56,10 +56,12 @@ See [Ubuntu install guide](docs/ubuntu-install.md) for install options.
 - Soft rhythmic pulse
 - Gentle musical bits / pluck patterns
 - Clear repeating melody motifs
+- Song-like arrangement layer with chord progression, bassline, and soft groove
 - Optional binaural drift
 - ADHD stimulation dial
 - Music bits amount control
 - Melody pattern and clarity controls
+- Song feel and groove controls
 - Session lengths: 15 / 25 / 45 / 90 minutes
 - Modes: Deep focus, Coding pulse, Reading calm, Energy boost
 - Browser mode and Ubuntu desktop mode
@@ -76,6 +78,7 @@ The audio is generated locally with the Web Audio API:
 - A low rhythmic pulse adds enough structure to reduce restlessness.
 - Gentle pentatonic/minor pluck patterns add musicality without becoming distracting lead melodies.
 - A separate clear melody layer repeats short motifs so the sound has an intentional pattern.
+- The Song feel layer adds bar-based structure: chord changes, bass movement, a very soft beat, and phrase repetition.
 - The ADHD dial changes stimulation level by adjusting movement, brightness, density, and pulse intensity.
 - The Music bits control changes how present the note patterns are.
 
