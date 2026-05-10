@@ -122,6 +122,7 @@ function createEngine() {
     musicTimer: null,
     melodyTimer: null,
     arrangementTimer: null,
+    tone: null,
     musicStep: 0,
     melodyStep: 0,
     arrangementStep: 0,
@@ -483,6 +484,137 @@ function startSongArrangement(engine, preset, stimulation) {
   }, sixteenthMs);
 }
 
+
+function midiLikeFrequency(root, semitone, octaveMultiplier = 1) {
+  return root * octaveMultiplier * Math.pow(2, semitone / 12);
+}
+
+function makeToneEngine(preset) {
+  if (!window.Tone) return null;
+
+  Tone.Transport.stop();
+  Tone.Transport.cancel();
+  Tone.Transport.bpm.value = preset.bpm;
+
+  const reverb = new Tone.Reverb({ decay: 4.8, wet: 0.18 }).toDestination();
+  const delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.16 }).connect(reverb);
+  const chorus = new Tone.Chorus({ frequency: 0.7, delayTime: 3.5, depth: 0.35, wet: 0.16 }).start().connect(delay);
+
+  const chord = new Tone.PolySynth(Tone.AMSynth, {
+    volume: -22,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.18, decay: 0.35, sustain: 0.55, release: 2.4 },
+    harmonicity: 1.5,
+    modulationIndex: 5,
+  }).connect(chorus);
+
+  const lead = new Tone.FMSynth({
+    volume: -18,
+    harmonicity: 1.8,
+    modulationIndex: 2.4,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.015, decay: 0.22, sustain: 0.2, release: 0.55 },
+    modulationEnvelope: { attack: 0.01, decay: 0.18, sustain: 0.1, release: 0.35 },
+  }).connect(delay);
+
+  const bass = new Tone.MonoSynth({
+    volume: -20,
+    oscillator: { type: 'triangle' },
+    filter: { Q: 1.1, type: 'lowpass', rolloff: -24 },
+    envelope: { attack: 0.025, decay: 0.2, sustain: 0.32, release: 0.42 },
+    filterEnvelope: { attack: 0.02, decay: 0.16, sustain: 0.2, release: 0.35, baseFrequency: 90, octaves: 2.3 },
+  }).connect(reverb);
+
+  const kick = new Tone.MembraneSynth({
+    volume: -24,
+    pitchDecay: 0.04,
+    octaves: 4,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.001, decay: 0.22, sustain: 0.01, release: 0.18 },
+  }).toDestination();
+
+  const hat = new Tone.NoiseSynth({
+    volume: -34,
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.045, sustain: 0, release: 0.025 },
+  }).toDestination();
+
+  return { chord, lead, bass, kick, hat, reverb, delay, chorus, step: 0 };
+}
+
+function toneFreq(preset, scaleIndex, octaveMultiplier = 1) {
+  const safe = ((scaleIndex % preset.scale.length) + preset.scale.length) % preset.scale.length;
+  return midiLikeFrequency(preset.root, preset.scale[safe], octaveMultiplier);
+}
+
+async function startToneArrangement(engine, preset) {
+  if (!window.Tone || ui.songFeel.value === 'off') return;
+
+  await Tone.start();
+  const tone = makeToneEngine(preset);
+  if (!tone) return;
+
+  const presetName = ui.mode.value;
+  const progression = progressions[presetName] || progressions.coding;
+
+  const repeatId = Tone.Transport.scheduleRepeat((time) => {
+    const style = ui.songFeel.value;
+    if (style === 'off') return;
+
+    const groove = Number(ui.groove.value);
+    const clarity = Number(ui.melodyClarity.value);
+    const step = tone.step++;
+    const bar = Math.floor(step / 16);
+    const inBar = step % 16;
+    const chordRoot = progression[bar % progression.length];
+    const motif = songMotifs[style] || songMotifs.ambient;
+
+    if (inBar === 0) {
+      const chordNotes = [0, 2, 4, 6].map((offset, i) => toneFreq(preset, chordRoot + offset, i >= 2 ? 2 : 1));
+      tone.chord.triggerAttackRelease(chordNotes, style === 'ambient' ? '1m' : '2n.', time, 0.42 + groove / 260);
+    }
+
+    if (style !== 'ambient' && (inBar === 0 || inBar === 8)) {
+      tone.kick.triggerAttackRelease('C1', '8n', time, 0.28 + groove / 180);
+    }
+
+    if ((style === 'lofi' && [4, 7, 12, 15].includes(inBar)) || (style === 'synth' && inBar % 4 === 2)) {
+      tone.hat.triggerAttackRelease('32n', time, 0.12 + groove / 260);
+    }
+
+    if ([0, 6, 8, 14].includes(inBar)) {
+      const bassIndex = inBar === 14 ? chordRoot + 2 : chordRoot;
+      tone.bass.triggerAttackRelease(toneFreq(preset, bassIndex, 0.5), '8n.', time, 0.34 + groove / 240);
+    }
+
+    const leadSteps = style === 'ambient' ? [0, 4, 8, 12] : [0, 2, 4, 6, 8, 10, 12, 14];
+    if (leadSteps.includes(inBar)) {
+      const motifIndex = Math.floor(step / 2) % motif.length;
+      const motifValue = motif[motifIndex];
+      if (motifValue >= 0) {
+        const phraseLift = bar % 4 === 3 && inBar >= 12 ? 1 : 0;
+        tone.lead.triggerAttackRelease(toneFreq(preset, chordRoot + motifValue + phraseLift, 2), style === 'ambient' ? '4n' : '8n.', time, 0.28 + clarity / 180);
+      }
+    }
+  }, '16n');
+
+  tone.repeatId = repeatId;
+  engine.tone = tone;
+  Tone.Transport.start('+0.05');
+}
+
+function stopToneArrangement(engineToClose) {
+  if (!engineToClose?.tone || !window.Tone) return;
+  try {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    Object.values(engineToClose.tone).forEach((item) => {
+      if (item && typeof item.dispose === 'function') item.dispose();
+    });
+  } catch {}
+  engineToClose.tone = null;
+}
+
 function startBinaural(engine, preset) {
   if (!ui.binaural.checked) return;
   const merger = engine.ctx.createChannelMerger(2);
@@ -531,7 +663,8 @@ async function start() {
   startPulse(audio, preset, stimulation);
   startMusicBits(audio, preset, stimulation);
   startClearMelody(audio, preset, stimulation);
-  startSongArrangement(audio, preset, stimulation);
+  if (!window.Tone) startSongArrangement(audio, preset, stimulation);
+  await startToneArrangement(audio, preset);
   startBinaural(audio, preset);
   applySettings();
 
@@ -563,6 +696,7 @@ function stop(completed = false) {
       if (engineToClose.musicTimer) clearInterval(engineToClose.musicTimer);
       if (engineToClose.melodyTimer) clearInterval(engineToClose.melodyTimer);
       if (engineToClose.arrangementTimer) clearInterval(engineToClose.arrangementTimer);
+      stopToneArrangement(engineToClose);
       engineToClose.oscillators.forEach((osc) => { try { osc.stop(); } catch {} });
       engineToClose.lfos.forEach((osc) => { try { osc.stop(); } catch {} });
       if (engineToClose.noiseNode) engineToClose.noiseNode.disconnect();

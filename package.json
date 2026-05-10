@@ -32,7 +32,10 @@
       "index.html",
       "styles.css",
       "app.js",
-      "desktop/**/*"
+      "desktop/**/*",
+      "node_modules/tone/build/Tone.js",
+      "node_modules/standardized-audio-context/**/*",
+      "node_modules/tslib/**/*"
     ],
     "linux": {
       "maintainer": "Yacov Drori <yacovdroridev@users.noreply.github.com>",
@@ -42,5 +45,8 @@
       ],
       "category": "Audio"
     }
+  },
+  "dependencies": {
+    "tone": "^15.1.22"
   }
 }

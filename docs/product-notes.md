@@ -18,7 +18,7 @@ The main design rule: enough movement to keep the ADHD brain engaged, not enough
 - Music bits amount: controls note presence/density.
 - Melody pattern: selects a recognizable repeating motif.
 - Melody clarity: controls how forward and defined the motif is.
-- Song feel: adds proper musical structure with chord progression, bassline, groove, and repeated phrases.
+- Song feel: adds proper musical structure with Tone.js instruments, chord progression, bassline, groove, effects, and repeated phrases.
 - Groove: controls the strength of the beat/bass arrangement.
 - Binaural drift: adds subtle left/right frequency drift.
 
