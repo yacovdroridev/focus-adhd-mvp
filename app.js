@@ -3,6 +3,9 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   play: $('playButton'),
   stop: $('stopButton'),
+  captureSystem: $('captureSystem'),
+  captureMic: $('captureMic'),
+  captureStatus: $('captureStatus'),
   mode: $('mode'),
   minutes: $('minutes'),
   adhd: $('adhd'),
@@ -128,7 +131,44 @@ function createEngine() {
     musicStep: 0,
     melodyStep: 0,
     arrangementStep: 0,
+    externalSource: null,
+    externalStream: null,
   };
+}
+
+async function startExternalCapture(type) {
+  if (!audio) {
+    alert('Please "Start focus" first to initialize the audio engine.');
+    return;
+  }
+  try {
+    if (audio.externalStream) {
+      audio.externalStream.getTracks().forEach(track => track.stop());
+      if (audio.externalSource) audio.externalSource.disconnect();
+    }
+    let stream;
+    if (type === 'system') {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    const source = audio.ctx.createMediaStreamSource(stream);
+    source.connect(audio.master); 
+    audio.externalStream = stream;
+    audio.externalSource = source;
+    ui.captureStatus.textContent = `Capturing ${type === 'system' ? 'System' : 'Mic'}`;
+    stream.getTracks()[0].onended = () => {
+      ui.captureStatus.textContent = 'Capture ended';
+      audio.externalSource = null;
+      audio.externalStream = null;
+    };
+  } catch (err) {
+    console.error(err);
+    ui.captureStatus.textContent = 'Capture failed';
+  }
 }
 
 function startPads(engine, preset, stimulation) {
@@ -137,17 +177,14 @@ function startPads(engine, preset, stimulation) {
     const gain = engine.ctx.createGain();
     const lfo = engine.ctx.createOscillator();
     const lfoGain = engine.ctx.createGain();
-
     osc.type = 'sine';
     osc.frequency.value = preset.root * ratio;
     gain.gain.value = 0.04 + stimulation * 0.0002;
-
     lfo.type = 'sine';
     lfo.frequency.value = 0.01 + index * 0.005;
     lfoGain.gain.value = 2.0 + stimulation * 0.05;
     lfo.connect(lfoGain);
     lfoGain.connect(osc.detune);
-
     osc.connect(gain).connect(engine.lowpass);
     osc.start();
     lfo.start();
@@ -198,20 +235,16 @@ function applySettings() {
   const stimulation = Number(ui.adhd.value);
   const volume = Number(ui.volume.value) / 100;
   const now = audio.ctx.currentTime;
-
   audio.master.gain.setTargetAtTime(volume * 0.42, now, 0.08);
   audio.lowpass.frequency.setTargetAtTime(preset.filter + stimulation * 8, now, 0.2);
-
   audio.pads.forEach(pad => {
     pad.osc.frequency.setTargetAtTime(preset.root * pad.ratio, now, 0.5);
     pad.gain.gain.setTargetAtTime(0.04 + stimulation * 0.0002, now, 0.2);
   });
-
   audio.noiseGain.gain.setTargetAtTime(ui.noise.checked ? 0.08 : 0, now, 0.5);
   audio.pulseGain.gain.setTargetAtTime(ui.pulse.checked ? 0.05 : 0, now, 0.5);
   if (audio.pulseOsc) audio.pulseOsc.frequency.setTargetAtTime(preset.root, now, 0.5);
   audio.binauralGain.gain.setTargetAtTime(ui.binaural.checked ? 0.025 : 0, now, 0.5);
-
   if (window.Tone && Tone.Transport.state === 'started') {
     Tone.Transport.bpm.rampTo(preset.bpm, 0.5);
   }
@@ -273,7 +306,7 @@ function playMelodyNote(engine, frequency, clarity, stimulation, accent = 1) {
   gain.gain.linearRampToValueAtTime(peak, now + 2.0);
   gain.gain.linearRampToValueAtTime(0, now + 6.0);
   osc.connect(filter).connect(gain);
-  gain.connect(pan).connect(engine.musicDelay);
+  gain.connect(pan).connect(engine.lowpass);
   osc.start(now);
   osc.stop(now + 7.0);
 }
@@ -316,29 +349,7 @@ function playChord(engine, preset, chordRootIndex, amount = 0.12) {
   });
 }
 
-function playSongLead(engine, preset, chordRootIndex, motifValue, clarity, style, accent = 1) {
-  if (motifValue < 0) return;
-  const frequency = scaleTone(preset, chordRootIndex + motifValue, 2);
-  const now = engine.ctx.currentTime;
-  const osc = engine.ctx.createOscillator();
-  const gain = engine.ctx.createGain();
-  const filter = engine.ctx.createBiquadFilter();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(frequency, now);
-  filter.type = 'lowpass';
-  filter.frequency.value = 600 + clarity * 2;
-  const peak = (0.005 + clarity * 0.0001) * accent;
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(peak, now + 3.0);
-  gain.gain.linearRampToValueAtTime(0, now + 10.0);
-  osc.connect(filter).connect(gain).connect(engine.lowpass);
-  gain.connect(engine.musicDelay);
-  osc.start(now);
-  osc.stop(now + 11.0);
-}
-
 const progressions = { deep: [0, 5, 3, 6], coding: [0, 4, 5, 3], reading: [0, 3, 5, 4], energy: [0, 5, 2, 4] };
-const songMotifs = { ambient: [0, -1, 2, -1, 4, 2], lofi: [0, 2, -1, 4], synth: [0, 2, 4, 2] };
 
 function startSongArrangement(engine, preset, stimulation) {
   const beatMs = 60000 / preset.bpm;
@@ -425,7 +436,6 @@ async function start() {
   if (!window.Tone) startSongArrangement(audio, preset, stimulation);
   await startToneArrangement(audio, preset);
   applySettings();
-
   remainingSeconds = Number(ui.minutes.value) * 60;
   endAt = Date.now() + remainingSeconds * 1000;
   updateTimerDisplay();
@@ -434,7 +444,6 @@ async function start() {
     updateTimerDisplay();
     if (remainingSeconds <= 0) stop(true);
   }, 250);
-
   ui.play.disabled = true;
   ui.stop.disabled = false;
   ui.status.textContent = 'Playing';
@@ -453,6 +462,7 @@ function stop(completed = false) {
       if (engineToClose.melodyTimer) clearInterval(engineToClose.melodyTimer);
       if (engineToClose.arrangementTimer) clearInterval(engineToClose.arrangementTimer);
       stopToneArrangement(engineToClose);
+      if (engineToClose.externalStream) engineToClose.externalStream.getTracks().forEach(track => track.stop());
       engineToClose.pads.forEach((p) => { try { p.osc.stop(); p.lfo.stop(); } catch {} });
       if (engineToClose.pulseOsc) engineToClose.pulseOsc.stop();
       engineToClose.binauralNodes.forEach(n => { if (n.stop) n.stop(); });
@@ -463,17 +473,18 @@ function stop(completed = false) {
   ui.play.disabled = false;
   ui.stop.disabled = true;
   ui.status.textContent = completed ? 'Session complete' : 'Ready';
+  ui.captureStatus.textContent = 'No external audio captured';
 }
 
 ui.play.addEventListener('click', start);
 ui.stop.addEventListener('click', () => stop(false));
+ui.captureSystem.addEventListener('click', () => startExternalCapture('system'));
+ui.captureMic.addEventListener('click', () => startExternalCapture('mic'));
 
-// Global listener for all controls
 document.querySelectorAll('input, select').forEach(el => {
   el.addEventListener('input', applySettings);
 });
 
-// Specific label updates
 ui.adhd.addEventListener('input', () => ui.adhdValue.textContent = ui.adhd.value);
 ui.volume.addEventListener('input', () => ui.volumeValue.textContent = ui.volume.value);
 ui.musicAmount.addEventListener('input', () => ui.musicAmountValue.textContent = ui.musicAmount.value);

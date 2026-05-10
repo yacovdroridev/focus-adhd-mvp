@@ -2,7 +2,7 @@
 
 Focus Field is a small browser + Ubuntu desktop MVP that generates procedural, low-distraction focus audio for ADHD-friendly work sessions.
 
-The goal is not to create “songs”. The goal is to create stable sound fields: no vocals, no hooks, no sudden drops, and no attention-grabbing surprises.
+The goal is to create stable **sound fields** that induce flow states using 40Hz Gamma-wave binaural beats and deep ambient washes.
 
 ## Quick start — web
 
@@ -18,8 +18,6 @@ Open:
 http://localhost:4173
 ```
 
-If the server is running on another machine on your network, use that machine hostname/IP instead of `localhost`.
-
 ## Quick start — Ubuntu desktop client
 
 Install dependencies:
@@ -34,93 +32,43 @@ Run the desktop app:
 npm start
 ```
 
-Build installable Ubuntu packages:
-
-```bash
-npm run pack:linux
-```
-
-Build outputs:
-
-```text
-dist/Focus Field-0.1.0.AppImage
-dist/focus-field_0.1.0_amd64.deb
-```
-
-See [Ubuntu install guide](docs/ubuntu-install.md) for install options.
-
 ## MVP features
 
-- Procedural ambient pads
-- Brown/pink-ish noise bed
-- Soft rhythmic pulse
-- Gentle musical bits / pluck patterns
-- Clear repeating melody motifs
-- Tone.js-powered song-like arrangement layer with chord progression, bassline, soft groove, and musical synth voices
-- Optional binaural drift
-- ADHD stimulation dial
-- Music bits amount control
-- Melody pattern and clarity controls
-- Song feel and groove controls
-- Session lengths: 15 / 25 / 45 / 90 minutes
-- Modes: Deep focus, Coding pulse, Reading calm, Energy boost
-- Browser mode and Ubuntu desktop mode
-- No backend
-- No tracking
-- Works offline after dependencies/build are installed
+- **40Hz Gamma Binaural Beats:** Steady frequency interference interference for deep focus and high-output states.
+- **External Audio Capture:** Layer focus frequencies over external sources like YouTube, Spotify, or your Microphone.
+- **Deep Ambient Flow:** Ethereal, slow-swelling soundscapes with no sharp percussion or distracting lead melodies.
+- **Procedural Ambient Pads:** Pure sine-wave drones with slow modulation.
+- **Brown/Pink Noise Bed:** Grounding background texture to mask distractions.
+- **Ethereal Note Bits:** Gentle, sparse note patterns that add musicality without stealing attention.
+- **Real-Time UI:** All settings (volume, ADHD dial, toggles, modes) update the audio engine instantly.
+- **ADHD Stimulation Dial:** Tunable stimulation level by adjusting movement, brightness, and density.
+- **Session Timer:** 15 / 25 / 45 / 90 minute focus blocks.
+- **Offline Capable:** Works entirely in your browser/desktop without a backend.
 
 ## How it works
 
-The audio is generated locally with the Web Audio API:
+The audio is generated locally with the Web Audio API and Tone.js:
 
-- Oscillators create slow ambient pads.
-- A generated noise layer creates a soft bed.
-- A low rhythmic pulse adds enough structure to reduce restlessness.
-- Gentle pentatonic/minor pluck patterns add musicality without becoming distracting lead melodies.
-- A separate clear melody layer repeats short motifs so the sound has an intentional pattern.
-- The Song feel layer uses Tone.js to add bar-based structure: chord changes, bass movement, a very soft beat, phrase repetition, delay, chorus, and reverb.
-- The ADHD dial changes stimulation level by adjusting movement, brightness, density, and pulse intensity.
-- The Music bits control changes how present the note patterns are.
-
-The Ubuntu app is an Electron wrapper around the same local Web Audio app. That keeps the MVP simple while leaving room for native features later.
+- **Binaural Beats:** Creates a precise 40Hz phantom tone in the brain by playing slightly offset frequencies in each ear.
+- **Ambient Wash:** Uses massive 15-second reverb decays and long feedback delays to create a "seamless" auditory environment.
+- **Sine Wave Purity:** Most oscillators use pure sine waves to reduce harmonic complexity and "attentional capture."
+- **External Capture:** Uses `getDisplayMedia` and `getUserMedia` to route external audio through the app's master engine, allowing for perfect mixing with focus frequencies.
 
 ## Development
 
 Run web version:
-
 ```bash
 npm run web
 ```
 
 Run desktop version:
-
 ```bash
 npm start
 ```
 
-Package desktop version:
-
-```bash
-npm run pack:linux
-```
-
-Check production dependency audit:
-
-```bash
-npm audit --omit=dev --audit-level=high
-```
-
-## Notes
-
-The dev start script uses Electron's `--no-sandbox` flag because many Ubuntu dev machines do not have Electron's setuid sandbox configured. The app currently loads only local files.
-
 ## Roadmap
-
-Good next steps:
 
 1. Save presets in `localStorage`.
 2. Add tray controls for Ubuntu.
-3. Add autostart/minimize-to-tray.
-4. Add session completion sounds.
-5. Add export/import of focus profiles.
-6. Add custom icon and release workflow.
+3. Add session completion sounds.
+4. Add export/import of focus profiles.
