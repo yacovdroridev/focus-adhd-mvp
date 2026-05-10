@@ -1,0 +1,46 @@
+{
+  "name": "focus-field",
+  "version": "0.1.0",
+  "description": "Procedural ADHD-friendly focus music desktop/web MVP.",
+  "homepage": "https://github.com/yacovdroridev/focus-adhd-mvp#readme",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron --no-sandbox .",
+    "web": "python3 -m http.server 4173",
+    "pack:linux": "electron-builder --linux AppImage deb"
+  },
+  "keywords": [
+    "adhd",
+    "focus",
+    "music",
+    "ambient",
+    "electron"
+  ],
+  "author": {
+    "name": "Yacov Drori",
+    "email": "yacovdroridev@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "ai.focusfield.app",
+    "productName": "Focus Field",
+    "files": [
+      "index.html",
+      "styles.css",
+      "app.js",
+      "desktop/**/*"
+    ],
+    "linux": {
+      "maintainer": "Yacov Drori <yacovdroridev@users.noreply.github.com>",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Audio"
+    }
+  }
+}
