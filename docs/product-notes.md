@@ -14,6 +14,8 @@ The main design rule: enough movement to keep the ADHD brain engaged, not enough
 - Volume: master output level.
 - Noise bed: adds brown/pink-ish background texture.
 - Pulse: adds rhythmic structure.
+- Music bits: adds soft arpeggio/pluck notes so the result feels more musical and less like plain noise.
+- Music bits amount: controls note presence/density.
 - Binaural drift: adds subtle left/right frequency drift.
 
 ## Design constraints
@@ -32,6 +34,7 @@ Prefer:
 - Slow modulation
 - Stable tonality
 - Gentle pulse
+- Simple pentatonic/minor note patterns
 - Predictable texture
 - Low-frequency warmth
 

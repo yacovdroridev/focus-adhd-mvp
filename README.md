@@ -54,8 +54,10 @@ See [Ubuntu install guide](docs/ubuntu-install.md) for install options.
 - Procedural ambient pads
 - Brown/pink-ish noise bed
 - Soft rhythmic pulse
+- Gentle musical bits / pluck patterns
 - Optional binaural drift
 - ADHD stimulation dial
+- Music bits amount control
 - Session lengths: 15 / 25 / 45 / 90 minutes
 - Modes: Deep focus, Coding pulse, Reading calm, Energy boost
 - Browser mode and Ubuntu desktop mode
@@ -70,7 +72,9 @@ The audio is generated locally with the Web Audio API:
 - Oscillators create slow ambient pads.
 - A generated noise layer creates a soft bed.
 - A low rhythmic pulse adds enough structure to reduce restlessness.
-- The ADHD dial changes stimulation level by adjusting movement, brightness, and pulse intensity.
+- Gentle pentatonic/minor pluck patterns add musicality without becoming distracting lead melodies.
+- The ADHD dial changes stimulation level by adjusting movement, brightness, density, and pulse intensity.
+- The Music bits control changes how present the note patterns are.
 
 The Ubuntu app is an Electron wrapper around the same local Web Audio app. That keeps the MVP simple while leaving room for native features later.
 

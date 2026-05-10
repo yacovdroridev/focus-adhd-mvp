@@ -9,18 +9,53 @@ const ui = {
   adhdValue: $('adhdValue'),
   volume: $('volume'),
   volumeValue: $('volumeValue'),
+  musicAmount: $('musicAmount'),
+  musicAmountValue: $('musicAmountValue'),
   noise: $('noise'),
   pulse: $('pulse'),
+  musicBits: $('musicBits'),
   binaural: $('binaural'),
   timeLeft: $('timeLeft'),
   status: $('status'),
 };
 
 const presets = {
-  deep: { root: 110, chord: [1, 1.5, 2, 2.5], bpm: 54, filter: 760, pulseDepth: 0.12 },
-  coding: { root: 130.81, chord: [1, 1.25, 1.5, 2], bpm: 72, filter: 980, pulseDepth: 0.18 },
-  reading: { root: 98, chord: [1, 1.333, 1.5, 2], bpm: 48, filter: 620, pulseDepth: 0.08 },
-  energy: { root: 146.83, chord: [1, 1.25, 1.667, 2], bpm: 88, filter: 1280, pulseDepth: 0.24 },
+  deep: {
+    root: 110,
+    chord: [1, 1.5, 2, 2.5],
+    bpm: 54,
+    filter: 760,
+    pulseDepth: 0.12,
+    scale: [0, 3, 5, 7, 10, 12, 15],
+    pattern: [0, 2, 4, 2, 5, 4, 2, 1],
+  },
+  coding: {
+    root: 130.81,
+    chord: [1, 1.25, 1.5, 2],
+    bpm: 72,
+    filter: 980,
+    pulseDepth: 0.18,
+    scale: [0, 2, 3, 7, 9, 12, 14],
+    pattern: [0, 2, 4, 6, 4, 2, 3, 1],
+  },
+  reading: {
+    root: 98,
+    chord: [1, 1.333, 1.5, 2],
+    bpm: 48,
+    filter: 620,
+    pulseDepth: 0.08,
+    scale: [0, 2, 5, 7, 9, 12, 14],
+    pattern: [0, 1, 3, 1, 4, 3, 1, 0],
+  },
+  energy: {
+    root: 146.83,
+    chord: [1, 1.25, 1.667, 2],
+    bpm: 88,
+    filter: 1280,
+    pulseDepth: 0.24,
+    scale: [0, 2, 4, 7, 9, 12, 16],
+    pattern: [0, 2, 4, 5, 6, 4, 2, 3],
+  },
 };
 
 let audio = null;
@@ -49,15 +84,38 @@ function createEngine() {
   const master = ctx.createGain();
   const compressor = ctx.createDynamicsCompressor();
   const lowpass = ctx.createBiquadFilter();
+  const musicDelay = ctx.createDelay(1.2);
+  const musicFeedback = ctx.createGain();
+  const musicWet = ctx.createGain();
 
   master.gain.value = 0;
   lowpass.type = 'lowpass';
   lowpass.Q.value = 0.7;
+
+  // A very small echo makes the note bits feel musical without adding busy melodies.
+  musicDelay.delayTime.value = 0.28;
+  musicFeedback.gain.value = 0.18;
+  musicWet.gain.value = 0.22;
+  musicDelay.connect(musicFeedback).connect(musicDelay);
+  musicDelay.connect(musicWet).connect(lowpass);
+
   lowpass.connect(compressor);
   compressor.connect(master);
   master.connect(ctx.destination);
 
-  return { ctx, master, lowpass, oscillators: [], gains: [], lfos: [], noiseNode: null, pulseTimer: null, driftTimer: null };
+  return {
+    ctx,
+    master,
+    lowpass,
+    musicDelay,
+    oscillators: [],
+    gains: [],
+    lfos: [],
+    noiseNode: null,
+    pulseTimer: null,
+    musicTimer: null,
+    musicStep: 0,
+  };
 }
 
 function startPads(engine, preset, stimulation) {
@@ -121,6 +179,72 @@ function startPulse(engine, preset, stimulation) {
   }, interval);
 }
 
+function noteFrequency(root, semitones, octave = 1) {
+  return root * octave * Math.pow(2, semitones / 12);
+}
+
+function playPluck(engine, frequency, amount, stimulation, accent = 1) {
+  const now = engine.ctx.currentTime;
+  const osc = engine.ctx.createOscillator();
+  const gain = engine.ctx.createGain();
+  const filter = engine.ctx.createBiquadFilter();
+  const pan = engine.ctx.createStereoPanner();
+
+  osc.type = stimulation > 70 ? 'triangle' : 'sine';
+  osc.frequency.setValueAtTime(frequency, now);
+  osc.detune.setValueAtTime((Math.random() - 0.5) * 7, now);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(900 + amount * 15 + stimulation * 8, now);
+  filter.Q.value = 1.1;
+
+  pan.pan.value = (Math.random() - 0.5) * 0.42;
+
+  const peak = (0.012 + amount * 0.00055) * accent;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.018);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42 + amount * 0.006);
+
+  osc.connect(filter).connect(gain);
+  gain.connect(pan).connect(engine.lowpass);
+  gain.connect(engine.musicDelay);
+
+  osc.start(now);
+  osc.stop(now + 1.35);
+}
+
+function startMusicBits(engine, preset, stimulation) {
+  if (!ui.musicBits.checked) return;
+
+  const beatMs = 60000 / preset.bpm;
+  const interval = Math.max(160, beatMs / (stimulation > 70 ? 2 : 1));
+
+  engine.musicTimer = setInterval(() => {
+    if (!ui.musicBits.checked) return;
+    const amount = Number(ui.musicAmount.value);
+    if (amount <= 0) return;
+
+    const density = 0.34 + amount / 180 + stimulation / 260;
+    const isRest = Math.random() > density;
+    const step = engine.musicStep++;
+
+    if (isRest && step % 8 !== 0) return;
+
+    const patternIndex = preset.pattern[step % preset.pattern.length];
+    const semitone = preset.scale[patternIndex % preset.scale.length];
+    const octave = step % 16 >= 12 ? 2 : 1;
+    const frequency = noteFrequency(preset.root, semitone, octave);
+    const accent = step % 8 === 0 ? 1.28 : 1;
+
+    playPluck(engine, frequency, amount, stimulation, accent);
+
+    // Occasional soft harmony note, quiet enough to add music without stealing attention.
+    if (amount > 58 && step % 8 === 4) {
+      playPluck(engine, noteFrequency(preset.root, preset.scale[(patternIndex + 2) % preset.scale.length], octave), amount * 0.55, stimulation, 0.65);
+    }
+  }, interval);
+}
+
 function startBinaural(engine, preset) {
   if (!ui.binaural.checked) return;
   const merger = engine.ctx.createChannelMerger(2);
@@ -167,6 +291,7 @@ async function start() {
   startPads(audio, preset, stimulation);
   startNoise(audio, stimulation);
   startPulse(audio, preset, stimulation);
+  startMusicBits(audio, preset, stimulation);
   startBinaural(audio, preset);
   applySettings();
 
@@ -189,16 +314,17 @@ function stop(completed = false) {
   timer = null;
 
   if (audio) {
-    const now = audio.ctx.currentTime;
-    audio.master.gain.setTargetAtTime(0, now, 0.05);
+    const engineToClose = audio;
+    const now = engineToClose.ctx.currentTime;
+    engineToClose.master.gain.setTargetAtTime(0, now, 0.05);
+    audio = null;
     setTimeout(() => {
-      if (!audio) return;
-      if (audio.pulseTimer) clearInterval(audio.pulseTimer);
-      audio.oscillators.forEach((osc) => { try { osc.stop(); } catch {} });
-      audio.lfos.forEach((osc) => { try { osc.stop(); } catch {} });
-      if (audio.noiseNode) audio.noiseNode.disconnect();
-      audio.ctx.close();
-      audio = null;
+      if (engineToClose.pulseTimer) clearInterval(engineToClose.pulseTimer);
+      if (engineToClose.musicTimer) clearInterval(engineToClose.musicTimer);
+      engineToClose.oscillators.forEach((osc) => { try { osc.stop(); } catch {} });
+      engineToClose.lfos.forEach((osc) => { try { osc.stop(); } catch {} });
+      if (engineToClose.noiseNode) engineToClose.noiseNode.disconnect();
+      engineToClose.ctx.close();
     }, 180);
   }
 
@@ -212,6 +338,7 @@ ui.stop.addEventListener('click', () => stop(false));
 ['mode', 'adhd', 'volume'].forEach((id) => ui[id].addEventListener('input', applySettings));
 ui.adhd.addEventListener('input', () => ui.adhdValue.textContent = ui.adhd.value);
 ui.volume.addEventListener('input', () => ui.volumeValue.textContent = ui.volume.value);
+ui.musicAmount.addEventListener('input', () => ui.musicAmountValue.textContent = ui.musicAmount.value);
 ui.minutes.addEventListener('change', () => {
   if (!audio) {
     remainingSeconds = Number(ui.minutes.value) * 60;
