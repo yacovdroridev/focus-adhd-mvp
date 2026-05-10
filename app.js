@@ -470,11 +470,6 @@ function startSongArrangement(engine, preset, stimulation) {
     if (style === 'lofi' && (inBar === 4 || inBar === 12)) playHat(engine, 0.018 + groove / 1800);
     if (style === 'synth' && inBar % 4 === 2) playHat(engine, 0.014 + groove / 2200);
 
-    if ([0, 6, 8, 14].includes(inBar)) {
-      const bassStep = inBar === 14 ? chordRootIndex + 2 : chordRootIndex;
-      playBass(engine, scaleTone(preset, bassStep, 0.5), 0.055 + groove / 900);
-    }
-
     const leadDensity = style === 'ambient' ? [0, 4, 8, 12] : [0, 2, 4, 6, 8, 10, 12, 14];
     if (leadDensity.includes(inBar)) {
       const motifIndex = Math.floor(step / 2) % motif.length;
@@ -580,11 +575,6 @@ async function startToneArrangement(engine, preset) {
 
     if ((style === 'lofi' && [4, 7, 12, 15].includes(inBar)) || (style === 'synth' && inBar % 4 === 2)) {
       tone.hat.triggerAttackRelease('32n', time, 0.12 + groove / 260);
-    }
-
-    if ([0, 6, 8, 14].includes(inBar)) {
-      const bassIndex = inBar === 14 ? chordRoot + 2 : chordRoot;
-      tone.bass.triggerAttackRelease(toneFreq(preset, bassIndex, 0.5), '8n.', time, 0.34 + groove / 240);
     }
 
     const leadSteps = style === 'ambient' ? [0, 4, 8, 12] : [0, 2, 4, 6, 8, 10, 12, 14];
