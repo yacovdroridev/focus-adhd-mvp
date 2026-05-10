@@ -16,6 +16,8 @@ The main design rule: enough movement to keep the ADHD brain engaged, not enough
 - Pulse: adds rhythmic structure.
 - Music bits: adds soft arpeggio/pluck notes so the result feels more musical and less like plain noise.
 - Music bits amount: controls note presence/density.
+- Melody pattern: selects a recognizable repeating motif.
+- Melody clarity: controls how forward and defined the motif is.
 - Binaural drift: adds subtle left/right frequency drift.
 
 ## Design constraints
@@ -35,6 +37,7 @@ Prefer:
 - Stable tonality
 - Gentle pulse
 - Simple pentatonic/minor note patterns
+- Short recognizable motifs
 - Predictable texture
 - Low-frequency warmth
 

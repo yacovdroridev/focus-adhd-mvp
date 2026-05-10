@@ -11,6 +11,9 @@ const ui = {
   volumeValue: $('volumeValue'),
   musicAmount: $('musicAmount'),
   musicAmountValue: $('musicAmountValue'),
+  melodyPattern: $('melodyPattern'),
+  melodyClarity: $('melodyClarity'),
+  melodyClarityValue: $('melodyClarityValue'),
   noise: $('noise'),
   pulse: $('pulse'),
   musicBits: $('musicBits'),
@@ -114,7 +117,9 @@ function createEngine() {
     noiseNode: null,
     pulseTimer: null,
     musicTimer: null,
+    melodyTimer: null,
     musicStep: 0,
+    melodyStep: 0,
   };
 }
 
@@ -245,6 +250,76 @@ function startMusicBits(engine, preset, stimulation) {
   }, interval);
 }
 
+
+const melodyMotifs = {
+  simple: [0, 2, 4, 2, 0, 2, 5, 4],
+  ascending: [0, 1, 2, 4, 5, 4, 2, 1],
+  call: [0, 2, 4, -1, 4, 5, 2, -1],
+  minimal: [0, -1, 2, -1, 0, -1, 2, -1],
+};
+
+function startClearMelody(engine, preset, stimulation) {
+  const selected = ui.melodyPattern.value;
+  if (selected === 'none') return;
+
+  const motif = melodyMotifs[selected] || melodyMotifs.simple;
+  const beatMs = 60000 / preset.bpm;
+  const stepMs = beatMs * 1.25;
+
+  engine.melodyTimer = setInterval(() => {
+    const selectedNow = ui.melodyPattern.value;
+    if (selectedNow === 'none') return;
+
+    const currentMotif = melodyMotifs[selectedNow] || melodyMotifs.simple;
+    const clarity = Number(ui.melodyClarity.value);
+    if (clarity <= 0) return;
+
+    const step = engine.melodyStep++;
+    const motifValue = currentMotif[step % currentMotif.length];
+    if (motifValue < 0) return;
+
+    const phrase = Math.floor(step / currentMotif.length) % 4;
+    const variation = phrase === 3 && step % currentMotif.length === currentMotif.length - 1 ? 1 : 0;
+    const scaleIndex = Math.min(preset.scale.length - 1, motifValue + variation);
+    const semitone = preset.scale[scaleIndex];
+    const octave = 2;
+    const frequency = noteFrequency(preset.root, semitone, octave);
+    const accent = step % currentMotif.length === 0 ? 1.38 : 1.05;
+
+    playMelodyNote(engine, frequency, clarity, stimulation, accent);
+  }, stepMs);
+}
+
+function playMelodyNote(engine, frequency, clarity, stimulation, accent = 1) {
+  const now = engine.ctx.currentTime;
+  const osc = engine.ctx.createOscillator();
+  const gain = engine.ctx.createGain();
+  const filter = engine.ctx.createBiquadFilter();
+  const pan = engine.ctx.createStereoPanner();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(frequency, now);
+  osc.detune.setValueAtTime((Math.random() - 0.5) * 3, now);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(1150 + clarity * 18 + stimulation * 4, now);
+  filter.Q.value = 1.6;
+  pan.pan.value = (Math.random() - 0.5) * 0.18;
+
+  const peak = (0.018 + clarity * 0.00062) * accent;
+  const sustain = peak * (0.28 + clarity / 320);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.024);
+  gain.gain.exponentialRampToValueAtTime(sustain, now + 0.17);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.74 + clarity * 0.003);
+
+  osc.connect(filter).connect(gain);
+  gain.connect(pan).connect(engine.lowpass);
+  gain.connect(engine.musicDelay);
+  osc.start(now);
+  osc.stop(now + 1.4);
+}
+
 function startBinaural(engine, preset) {
   if (!ui.binaural.checked) return;
   const merger = engine.ctx.createChannelMerger(2);
@@ -292,6 +367,7 @@ async function start() {
   startNoise(audio, stimulation);
   startPulse(audio, preset, stimulation);
   startMusicBits(audio, preset, stimulation);
+  startClearMelody(audio, preset, stimulation);
   startBinaural(audio, preset);
   applySettings();
 
@@ -321,6 +397,7 @@ function stop(completed = false) {
     setTimeout(() => {
       if (engineToClose.pulseTimer) clearInterval(engineToClose.pulseTimer);
       if (engineToClose.musicTimer) clearInterval(engineToClose.musicTimer);
+      if (engineToClose.melodyTimer) clearInterval(engineToClose.melodyTimer);
       engineToClose.oscillators.forEach((osc) => { try { osc.stop(); } catch {} });
       engineToClose.lfos.forEach((osc) => { try { osc.stop(); } catch {} });
       if (engineToClose.noiseNode) engineToClose.noiseNode.disconnect();
@@ -339,6 +416,7 @@ ui.stop.addEventListener('click', () => stop(false));
 ui.adhd.addEventListener('input', () => ui.adhdValue.textContent = ui.adhd.value);
 ui.volume.addEventListener('input', () => ui.volumeValue.textContent = ui.volume.value);
 ui.musicAmount.addEventListener('input', () => ui.musicAmountValue.textContent = ui.musicAmount.value);
+ui.melodyClarity.addEventListener('input', () => ui.melodyClarityValue.textContent = ui.melodyClarity.value);
 ui.minutes.addEventListener('change', () => {
   if (!audio) {
     remainingSeconds = Number(ui.minutes.value) * 60;
