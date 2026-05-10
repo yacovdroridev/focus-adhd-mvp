@@ -1,40 +1,53 @@
 # Focus Field — ADHD Music MVP
 
-A tiny browser + Ubuntu desktop MVP that generates procedural focus audio for ADHD-friendly work sessions.
+Focus Field is a small browser + Ubuntu desktop MVP that generates procedural, low-distraction focus audio for ADHD-friendly work sessions.
 
-## Run as web app
+The goal is not to create “songs”. The goal is to create stable sound fields: no vocals, no hooks, no sudden drops, and no attention-grabbing surprises.
 
-Open `index.html` directly in a browser, or serve the folder:
+## Quick start — web
+
+From the project folder:
 
 ```bash
 python3 -m http.server 4173
 ```
 
-Then visit http://localhost:4173
+Open:
 
-## Run as Ubuntu desktop app
+```text
+http://localhost:4173
+```
 
-Install dependencies once:
+If the server is running on another machine on your network, use that machine hostname/IP instead of `localhost`.
+
+## Quick start — Ubuntu desktop client
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Start the desktop client:
+Run the desktop app:
 
 ```bash
 npm start
 ```
 
-The dev start script uses Electron's `--no-sandbox` flag because many Ubuntu dev machines do not have Electron's setuid sandbox configured. The app loads only local files.
-
-Build Ubuntu packages:
+Build installable Ubuntu packages:
 
 ```bash
 npm run pack:linux
 ```
 
-Outputs will be created under `dist/` as AppImage and `.deb` packages.
+Build outputs:
+
+```text
+dist/Focus Field-0.1.0.AppImage
+dist/focus-field_0.1.0_amd64.deb
+```
+
+See [Ubuntu install guide](docs/ubuntu-install.md) for install options.
 
 ## MVP features
 
@@ -43,10 +56,61 @@ Outputs will be created under `dist/` as AppImage and `.deb` packages.
 - Soft rhythmic pulse
 - Optional binaural drift
 - ADHD stimulation dial
-- 15/25/45/90 minute sessions
+- Session lengths: 15 / 25 / 45 / 90 minutes
+- Modes: Deep focus, Coding pulse, Reading calm, Energy boost
 - Browser mode and Ubuntu desktop mode
-- No backend, no tracking
+- No backend
+- No tracking
+- Works offline after dependencies/build are installed
+
+## How it works
+
+The audio is generated locally with the Web Audio API:
+
+- Oscillators create slow ambient pads.
+- A generated noise layer creates a soft bed.
+- A low rhythmic pulse adds enough structure to reduce restlessness.
+- The ADHD dial changes stimulation level by adjusting movement, brightness, and pulse intensity.
+
+The Ubuntu app is an Electron wrapper around the same local Web Audio app. That keeps the MVP simple while leaving room for native features later.
+
+## Development
+
+Run web version:
+
+```bash
+npm run web
+```
+
+Run desktop version:
+
+```bash
+npm start
+```
+
+Package desktop version:
+
+```bash
+npm run pack:linux
+```
+
+Check production dependency audit:
+
+```bash
+npm audit --omit=dev --audit-level=high
+```
 
 ## Notes
 
-The desktop client is an Electron wrapper around the same local Web Audio app. That keeps the MVP simple while leaving room for native features later: tray control, global shortcuts, autostart, saved presets, and offline sound packs.
+The dev start script uses Electron's `--no-sandbox` flag because many Ubuntu dev machines do not have Electron's setuid sandbox configured. The app currently loads only local files.
+
+## Roadmap
+
+Good next steps:
+
+1. Save presets in `localStorage`.
+2. Add tray controls for Ubuntu.
+3. Add autostart/minimize-to-tray.
+4. Add session completion sounds.
+5. Add export/import of focus profiles.
+6. Add custom icon and release workflow.
