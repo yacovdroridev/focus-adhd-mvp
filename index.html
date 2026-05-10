@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Focus Field — ADHD Music MVP</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <p class="eyebrow">Procedural focus audio</p>
+        <h1>Focus Field</h1>
+        <p class="subtitle">Stable, low-distraction soundscapes for ADHD focus sessions.</p>
+      </section>
+
+      <section class="panel transport">
+        <button id="playButton" class="primary">Start focus</button>
+        <button id="stopButton" class="secondary" disabled>Stop</button>
+        <div class="timer">
+          <span id="timeLeft">25:00</span>
+          <small id="status">Ready</small>
+        </div>
+      </section>
+
+      <section class="grid">
+        <label class="control panel">
+          <span>Mode</span>
+          <select id="mode">
+            <option value="deep">Deep focus</option>
+            <option value="coding">Coding pulse</option>
+            <option value="reading">Reading calm</option>
+            <option value="energy">Energy boost</option>
+          </select>
+        </label>
+
+        <label class="control panel">
+          <span>Session length</span>
+          <select id="minutes">
+            <option value="15">15 min</option>
+            <option value="25" selected>25 min</option>
+            <option value="45">45 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </label>
+
+        <label class="control panel">
+          <span>ADHD dial <b id="adhdValue">55</b></span>
+          <input id="adhd" type="range" min="0" max="100" value="55" />
+        </label>
+
+        <label class="control panel">
+          <span>Volume <b id="volumeValue">45</b></span>
+          <input id="volume" type="range" min="0" max="100" value="45" />
+        </label>
+      </section>
+
+      <section class="panel toggles">
+        <label><input id="noise" type="checkbox" checked /> Brown/pink noise bed</label>
+        <label><input id="pulse" type="checkbox" checked /> Soft rhythmic pulse</label>
+        <label><input id="binaural" type="checkbox" /> Subtle binaural drift</label>
+      </section>
+
+      <section class="panel note">
+        <h2>What this MVP does</h2>
+        <ul>
+          <li>Generates endless ambient focus music locally in your browser.</li>
+          <li>Avoids vocals, hooks, sharp transitions, and attention-grabbing melodies.</li>
+          <li>Lets you tune stimulation with the ADHD dial.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
