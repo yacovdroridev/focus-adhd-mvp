@@ -27,7 +27,7 @@ const ui = {
 
 const presets = {
   deep: {
-    root: 110,
+    root: 220,
     chord: [1, 1.5, 2, 2.5],
     bpm: 54,
     filter: 760,
@@ -36,7 +36,7 @@ const presets = {
     pattern: [0, 2, 4, 2, 5, 4, 2, 1],
   },
   coding: {
-    root: 130.81,
+    root: 261.62,
     chord: [1, 1.25, 1.5, 2],
     bpm: 72,
     filter: 980,
@@ -45,7 +45,7 @@ const presets = {
     pattern: [0, 2, 4, 6, 4, 2, 3, 1],
   },
   reading: {
-    root: 98,
+    root: 196,
     chord: [1, 1.333, 1.5, 2],
     bpm: 48,
     filter: 620,
@@ -54,7 +54,7 @@ const presets = {
     pattern: [0, 1, 3, 1, 4, 3, 1, 0],
   },
   energy: {
-    root: 146.83,
+    root: 293.66,
     chord: [1, 1.25, 1.667, 2],
     bpm: 88,
     filter: 1280,
@@ -90,6 +90,7 @@ function createEngine() {
   const master = ctx.createGain();
   const compressor = ctx.createDynamicsCompressor();
   const lowpass = ctx.createBiquadFilter();
+  const highpass = ctx.createBiquadFilter();
   const musicDelay = ctx.createDelay(1.2);
   const musicFeedback = ctx.createGain();
   const musicWet = ctx.createGain();
@@ -98,6 +99,10 @@ function createEngine() {
   lowpass.type = 'lowpass';
   lowpass.Q.value = 0.7;
 
+  highpass.type = 'highpass';
+  highpass.frequency.value = 200; // Cut everything below 200Hz
+  highpass.Q.value = 0.7;
+
   // A very small echo makes the note bits feel musical without adding busy melodies.
   musicDelay.delayTime.value = 0.28;
   musicFeedback.gain.value = 0.18;
@@ -105,7 +110,8 @@ function createEngine() {
   musicDelay.connect(musicFeedback).connect(musicDelay);
   musicDelay.connect(musicWet).connect(lowpass);
 
-  lowpass.connect(compressor);
+  lowpass.connect(highpass);
+  highpass.connect(compressor);
   compressor.connect(master);
   master.connect(ctx.destination);
 
@@ -113,6 +119,7 @@ function createEngine() {
     ctx,
     master,
     lowpass,
+    highpass,
     musicDelay,
     oscillators: [],
     gains: [],
@@ -374,24 +381,6 @@ function playHat(engine, strength = 0.05) {
   setTimeout(() => noise.disconnect(), 120);
 }
 
-function playBass(engine, frequency, strength = 0.12) {
-  const now = engine.ctx.currentTime;
-  const osc = engine.ctx.createOscillator();
-  const gain = engine.ctx.createGain();
-  const filter = engine.ctx.createBiquadFilter();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(frequency, now);
-  filter.type = 'lowpass';
-  filter.frequency.value = 420;
-  filter.Q.value = 0.9;
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(strength, now + 0.025);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
-  osc.connect(filter).connect(gain).connect(engine.lowpass);
-  osc.start(now);
-  osc.stop(now + 0.55);
-}
-
 function playChord(engine, preset, chordRootIndex, amount = 0.12) {
   const chord = [0, 2, 4, 6];
   chord.forEach((offset, i) => {
@@ -491,7 +480,8 @@ function makeToneEngine(preset) {
   Tone.Transport.cancel();
   Tone.Transport.bpm.value = preset.bpm;
 
-  const reverb = new Tone.Reverb({ decay: 4.8, wet: 0.18 }).toDestination();
+  const highpass = new Tone.Filter(200, 'highpass').toDestination();
+  const reverb = new Tone.Reverb({ decay: 4.8, wet: 0.18 }).connect(highpass);
   const delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.16 }).connect(reverb);
   const chorus = new Tone.Chorus({ frequency: 0.7, delayTime: 3.5, depth: 0.35, wet: 0.16 }).start().connect(delay);
 
@@ -512,29 +502,21 @@ function makeToneEngine(preset) {
     modulationEnvelope: { attack: 0.01, decay: 0.18, sustain: 0.1, release: 0.35 },
   }).connect(delay);
 
-  const bass = new Tone.MonoSynth({
-    volume: -20,
-    oscillator: { type: 'triangle' },
-    filter: { Q: 1.1, type: 'lowpass', rolloff: -24 },
-    envelope: { attack: 0.025, decay: 0.2, sustain: 0.32, release: 0.42 },
-    filterEnvelope: { attack: 0.02, decay: 0.16, sustain: 0.2, release: 0.35, baseFrequency: 90, octaves: 2.3 },
-  }).connect(reverb);
-
   const kick = new Tone.MembraneSynth({
-    volume: -24,
-    pitchDecay: 0.04,
-    octaves: 4,
+    volume: -30,
+    pitchDecay: 0.02,
+    octaves: 2,
     oscillator: { type: 'sine' },
-    envelope: { attack: 0.001, decay: 0.22, sustain: 0.01, release: 0.18 },
-  }).toDestination();
+    envelope: { attack: 0.001, decay: 0.1, sustain: 0.01, release: 0.1 },
+  }).connect(highpass);
 
   const hat = new Tone.NoiseSynth({
     volume: -34,
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.045, sustain: 0, release: 0.025 },
-  }).toDestination();
+  }).connect(highpass);
 
-  return { chord, lead, bass, kick, hat, reverb, delay, chorus, step: 0 };
+  return { chord, lead, kick, hat, reverb, delay, chorus, step: 0 };
 }
 
 function toneFreq(preset, scaleIndex, octaveMultiplier = 1) {
